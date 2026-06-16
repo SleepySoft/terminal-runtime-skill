@@ -58,6 +58,32 @@ python {baseDir}/scripts/terminal_runtime_client.py lock-acquire --session-id ba
 python {baseDir}/scripts/terminal_runtime_client.py act --session-id bash-main --actor openclaw --lock-token '<token>' --type key --key DOWN
 ```
 
+### 回看历史输出
+
+查看最近滚出屏幕的历史行：
+
+```bash
+python {baseDir}/scripts/terminal_runtime_client.py history --session-id bash-main --tail 200
+```
+
+以纯文本方式查看（不带 JSON 包装）：
+
+```bash
+python {baseDir}/scripts/terminal_runtime_client.py history --session-id bash-main --tail 200 --plain
+```
+
+分页滚动（从第 200 行开始再取 200 行）：
+
+```bash
+python {baseDir}/scripts/terminal_runtime_client.py history --session-id bash-main --offset 200 --limit 200
+```
+
+清空历史：
+
+```bash
+python {baseDir}/scripts/terminal_runtime_client.py history-reset --session-id bash-main
+```
+
 ---
 
 ## 进程生命周期

@@ -89,6 +89,30 @@ ATR 只监控它**直接启动**的进程。创建 session 时必须把目标程
 
 ---
 
+## 回看历史输出
+
+终端内容会滚动，超出当前屏幕的文字不会丢失，而是进入 scrollback 历史。
+
+当 `observe` 看到的当前屏幕不够完整时（例如怀疑上面还有内容、或者目标 Agent 的思考过程已经滚出屏幕），调用：
+
+```text
+{baseDir}/scripts/terminal_runtime_client.py history --session-id <id> --tail 200
+```
+
+需要分页滚动时：
+
+```text
+{baseDir}/scripts/terminal_runtime_client.py history --session-id <id> --offset 200 --limit 200
+```
+
+需要清空历史时：
+
+```text
+{baseDir}/scripts/terminal_runtime_client.py history-reset --session-id <id>
+```
+
+---
+
 ## 详细用法
 
 工具调用示例、Observation 字段解释、Shell/TUI/CLI Agent 行为以及 `dialog` 测试用例见：

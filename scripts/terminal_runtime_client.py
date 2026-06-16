@@ -72,6 +72,20 @@ def cmd_screenshot(args: argparse.Namespace) -> None:
     print(text, end="")
 
 
+def cmd_history(args: argparse.Namespace) -> None:
+    qs = urllib.parse.urlencode({"tail": args.tail, "offset": args.offset, "limit": args.limit})
+    data = request("GET", f"/sessions/{urllib.parse.quote(args.session_id)}/history/scrollback?{qs}")
+    if args.plain:
+        for line in data.get("scrollback", []):
+            print(line)
+    else:
+        print_json(data)
+
+
+def cmd_history_reset(args: argparse.Namespace) -> None:
+    print_json(request("POST", f"/sessions/{urllib.parse.quote(args.session_id)}/history/reset?actor={urllib.parse.quote(args.actor)}"))
+
+
 def cmd_act(args: argparse.Namespace) -> None:
     action: Dict[str, Any] = {"type": args.type}
     if args.text is not None:
@@ -130,6 +144,19 @@ def main() -> None:
     sp = sub.add_parser("screenshot")
     sp.add_argument("--session-id", default=DEFAULT_SESSION_ID)
     sp.set_defaults(func=cmd_screenshot)
+
+    sp = sub.add_parser("history")
+    sp.add_argument("--session-id", default=DEFAULT_SESSION_ID)
+    sp.add_argument("--tail", type=int, default=200)
+    sp.add_argument("--offset", type=int, default=0)
+    sp.add_argument("--limit", type=int, default=200)
+    sp.add_argument("--plain", action="store_true", help="print as plain text instead of JSON")
+    sp.set_defaults(func=cmd_history)
+
+    sp = sub.add_parser("history-reset")
+    sp.add_argument("--session-id", default=DEFAULT_SESSION_ID)
+    sp.add_argument("--actor", default=DEFAULT_ACTOR)
+    sp.set_defaults(func=cmd_history_reset)
 
     sp = sub.add_parser("act")
     sp.add_argument("--session-id", default=DEFAULT_SESSION_ID)

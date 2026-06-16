@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import asyncio
 import errno
-import fcntl
 import os
 import queue
 import re
@@ -50,10 +49,18 @@ import shlex
 import signal
 import struct
 import subprocess
-import termios
 import threading
 import time
 import uuid
+
+# POSIX-only modules. The service requires POSIX PTY to run, but we allow the
+# module to be imported on other platforms so that non-PTY logic can be tested.
+try:
+    import fcntl  # type: ignore[import]
+    import termios  # type: ignore[import]
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[misc]
+    termios = None  # type: ignore[misc]
 from pathlib import Path
 from collections import deque
 from dataclasses import dataclass, field
@@ -80,6 +87,8 @@ DEFAULT_RAW_LOG_LIMIT = int(os.environ.get("ATR_RAW_LOG_LIMIT", "4000"))
 DEFAULT_AUDIT_LIMIT = int(os.environ.get("ATR_AUDIT_LIMIT", "2000"))
 DEFAULT_EVENT_LIMIT = int(os.environ.get("ATR_EVENT_LIMIT", "2000"))
 DEFAULT_IDLE_TTL_SEC = int(os.environ.get("ATR_IDLE_TTL_SEC", "0"))  # 0 disables cleanup
+DEFAULT_SCROLLBACK_LIMIT = int(os.environ.get("ATR_SCROLLBACK_LIMIT", "10000"))
+MAX_SCROLLBACK_LINES_PER_UPDATE = int(os.environ.get("ATR_SCROLLBACK_MAX_LINES_PER_UPDATE", "50"))
 
 BASE_DIR = Path(__file__).resolve().parent
 UI_FILE = BASE_DIR / "terminal_runtime_frontend.html"
@@ -380,6 +389,8 @@ class TerminalSession:
         self.raw_chunks: Deque[str] = deque(maxlen=DEFAULT_RAW_LOG_LIMIT)
         self.events: Deque[TerminalEvent] = deque(maxlen=DEFAULT_EVENT_LIMIT)
         self.audit: Deque[AuditEntry] = deque(maxlen=DEFAULT_AUDIT_LIMIT)
+        self.scrollback: Deque[str] = deque(maxlen=DEFAULT_SCROLLBACK_LIMIT)
+        self._prev_display_lines: Optional[List[str]] = None
         self.subscribers: List[queue.Queue] = []
         self.reader_thread: Optional[threading.Thread] = None
 
@@ -515,6 +526,7 @@ class TerminalSession:
                 self.last_active_at = now()
                 self.update_seq += 1
                 seq = self.update_seq
+                self._update_scrollback()
                 self.cond.notify_all()
             self._emit("screen_updated", {"seq": seq, "bytes": len(data)})
             for mode_name, value in changed_modes:
@@ -530,6 +542,43 @@ class TerminalSession:
                         setattr(self.modes, attr, value)
                         changed.append((attr, value))
         return changed
+
+    def _update_scrollback(self) -> None:
+        """Append lines that have scrolled off the top of the screen.
+
+        This mimics a real terminal scrollback buffer: when new lines appear
+        at the bottom and push old lines off the top, those old lines are
+        preserved. Large screen redraws (e.g. TUI refreshes) are ignored.
+        """
+        curr_lines = [line.rstrip() for line in self.screen.display]
+        if self._prev_display_lines is None:
+            self._prev_display_lines = curr_lines
+            return
+
+        prev_lines = self._prev_display_lines
+        prev_len = len(prev_lines)
+        curr_len = len(curr_lines)
+
+        # Find the longest suffix of the previous display that matches a
+        # prefix of the current display. The unmatched prefix of the previous
+        # display has scrolled off the top.
+        max_match = 0
+        max_possible = min(prev_len, curr_len)
+        for k in range(1, max_possible + 1):
+            if prev_lines[-k:] == curr_lines[:k]:
+                max_match = k
+
+        scrolled_count = prev_len - max_match
+        # Only treat as scroll if some content overlaps between the old and new
+        # display. A complete redraw (max_match == 0) is likely a TUI refresh and
+        # should not pollute the scrollback buffer.
+        if max_match > 0 and 0 < scrolled_count <= MAX_SCROLLBACK_LINES_PER_UPDATE:
+            for line in prev_lines[:scrolled_count]:
+                stripped = line.rstrip()
+                if stripped:
+                    self.scrollback.append(stripped)
+
+        self._prev_display_lines = curr_lines
 
     # ---------------------------------------------------------------------
     # Events and audit
@@ -560,6 +609,17 @@ class TerminalSession:
         with self.lock:
             if q in self.subscribers:
                 self.subscribers.remove(q)
+
+    def get_scrollback(self, tail: int = 200) -> List[str]:
+        with self.lock:
+            return list(self.scrollback)[-tail:]
+
+    def reset_scrollback(self, actor: str = "system") -> None:
+        with self.lock:
+            count = len(self.scrollback)
+            self.scrollback.clear()
+        self._audit(actor, "scrollback_reset", {"cleared_lines": count})
+        self._emit("scrollback_reset", {"cleared_lines": count})
 
     # ---------------------------------------------------------------------
     # Locking / takeover
@@ -705,6 +765,7 @@ class TerminalSession:
             self.rows = rows
             self.cols = cols
             self.screen.resize(lines=rows, columns=cols)
+            self._prev_display_lines = None  # avoid treating resize as scroll
             set_winsize(self.master_fd, rows, cols)
             self.update_seq += 1
             self.last_update_ts = now()
@@ -1011,6 +1072,34 @@ def observe(
 def screenshot(session_id: str, authorization: Optional[str] = Header(default=None)) -> str:
     require_auth(authorization)
     return get_session_or_404(session_id).observe("agent")["screen"]["visible_text"] + "\n"
+
+
+@app.get("/sessions/{session_id}/history/scrollback")
+def scrollback(
+    session_id: str,
+    tail: int = Query(200, ge=1, le=10000),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
+    authorization: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_auth(authorization)
+    s = get_session_or_404(session_id)
+    lines = s.get_scrollback(max(tail, offset + limit))
+    if offset:
+        lines = lines[offset:]
+    lines = lines[:limit]
+    return {"session_id": session_id, "scrollback": lines, "offset": offset, "limit": limit}
+
+
+@app.post("/sessions/{session_id}/history/reset")
+def reset_scrollback(
+    session_id: str,
+    actor: str = Query("anonymous"),
+    authorization: Optional[str] = Header(default=None),
+) -> Dict[str, Any]:
+    require_auth(authorization)
+    get_session_or_404(session_id).reset_scrollback(actor)
+    return {"ok": True}
 
 
 @app.post("/sessions/{session_id}/actions")
