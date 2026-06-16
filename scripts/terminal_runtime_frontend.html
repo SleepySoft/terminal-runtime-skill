@@ -466,7 +466,7 @@
       </div>
 
       <div class="control-group">
-        <label>Scrollback History（每页 = Rows，第 1 页 = 最新）</label>
+        <label>Scrollback History（显示在主窗口，每页 = Rows，第 1 页 = 最新）</label>
         <div class="button-row" style="align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
             <div>
@@ -478,7 +478,7 @@
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button id="scrollbackPrevBtn" class="secondary" onclick="loadScrollbackPrev()">← Prev</button>
             <button id="scrollbackNextBtn" class="secondary" onclick="loadScrollbackNext()">Next →</button>
-            <button class="secondary" onclick="jumpToLatestScrollback()">Latest</button>
+            <button class="secondary" onclick="showCurrentScreen()">Current Screen</button>
             <button class="secondary" onclick="loadScrollback()">Refresh</button>
             <button class="danger small" onclick="resetScrollback()">Clear</button>
           </div>
@@ -611,12 +611,10 @@
         <button id="tab-json" class="secondary tab-active" onclick="showPanel('json')">Observation JSON</button>
         <button id="tab-events" class="secondary" onclick="showPanel('events')">Events</button>
         <button id="tab-logs" class="secondary" onclick="showPanel('logs')">Logs</button>
-        <button id="tab-history" class="secondary" onclick="showPanel('history')">History</button>
       </div>
       <pre id="jsonPanel" class="panel"></pre>
       <pre id="eventsPanel" class="panel" style="display:none"></pre>
       <pre id="logsPanel" class="panel" style="display:none"></pre>
-      <pre id="historyPanel" class="panel" style="display:none"></pre>
     </div>
   </section>
 </main>
@@ -710,7 +708,7 @@
 
   function showPanel(name) {
     activePanel = name;
-    for (const n of ['json', 'events', 'logs', 'history']) {
+    for (const n of ['json', 'events', 'logs']) {
       $('tab-' + n).classList.toggle('tab-active', n === name);
       $(n + 'Panel').style.display = n === name ? 'block' : 'none';
     }
@@ -1283,10 +1281,9 @@
       const summary = lines.length
         ? `--- 第 ${startLine}–${endLine} 行 / 共 ${total} 行 (page=${page}, rows=${limit}) ---`
         : `--- 该范围无历史 (page=${page}, rows=${limit}) / 共 ${total} 行 ---`;
-      $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + '\n' + summary;
+      $('screen').textContent = lines.join('\n') + (lines.length ? '\n' : '') + '\n' + summary;
       $('scrollbackRange').textContent = lines.length ? `第 ${page} / ${totalPages} 页 · 第 ${startLine}–${endLine} 行 / 共 ${total} 行` : `第 ${page} / ${totalPages} 页 · 无数据 / 共 ${total} 行`;
       updateScrollbackButtons(page, totalPages);
-      showPanel('history');
       showToast(`Loaded ${lines.length} history lines`);
     } catch (e) { setServer(false, 'server: ' + e.message); showToast('Load history failed: ' + e.message, true); }
   }
@@ -1303,9 +1300,15 @@
     loadScrollback();
   }
 
-  function jumpToLatestScrollback() {
+  function showCurrentScreen() {
     $('scrollbackPage').value = '1';
-    loadScrollback();
+    $('scrollbackRange').textContent = 'current screen';
+    if (lastObservation) {
+      const text = lastObservation?.screen?.visible_text ?? '';
+      $('screen').textContent = text + (text.endsWith('\n') ? '' : '\n');
+    } else {
+      observe('agent');
+    }
   }
 
   async function resetScrollback() {
@@ -1313,10 +1316,9 @@
     if (!confirm('Clear scrollback history for session ' + sid() + '?')) return;
     try {
       await request(`/sessions/${encodeURIComponent(sid())}/history/reset?actor=${encodeURIComponent(actor())}`, {method: 'POST'});
-      $('historyPanel').textContent = '';
       $('scrollbackPage').value = '1';
-      $('scrollbackRange').textContent = '-';
       updateScrollbackButtons(1, 1);
+      showCurrentScreen();
       showToast('Scrollback cleared');
     } catch (e) { setServer(false, 'server: ' + e.message); showToast('Clear history failed: ' + e.message, true); }
   }
