@@ -1086,10 +1086,14 @@ def scrollback(
     s = get_session_or_404(session_id)
     with s.lock:
         total = len(s.scrollback)
-    lines = s.get_scrollback(max(tail, offset + limit))
+    # scrollback stores lines oldest-first. tail/offset/limit describe a window
+    # counted from the newest end so callers can page backwards through history.
+    # The returned list is still oldest-first within the selected window, meaning
+    # the newest line of the page is the last element.
+    lines = s.get_scrollback(tail)
     if offset:
-        lines = lines[offset:]
-    lines = lines[:limit]
+        lines = lines[:-offset] if offset < len(lines) else []
+    lines = lines[-limit:]
     return {"session_id": session_id, "scrollback": lines, "offset": offset, "limit": limit, "total": total}
 
 

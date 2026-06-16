@@ -466,13 +466,9 @@
       </div>
 
       <div class="control-group">
-        <label>Scrollback History</label>
+        <label>Scrollback History（每页 = Rows，第 1 页 = 最新）</label>
         <div class="button-row" style="align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
-            <div>
-              <label style="margin-bottom:2px;">每页行数（建议=Rows）</label>
-              <input id="scrollbackLimit" type="number" value="30" min="1" max="1000" style="width:90px;" />
-            </div>
             <div>
               <label style="margin-bottom:2px;">当前页码</label>
               <input id="scrollbackPage" type="number" value="1" min="1" style="width:90px;" />
@@ -680,7 +676,7 @@
   function closeCreateModal() { $('createOverlay').style.display = 'none'; }
 
   function saveSettings() {
-    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackPage','scrollbackLimit'];
+    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackPage'];
     const obj = {};
     for (const id of ids) {
       const el = $(id);
@@ -781,9 +777,6 @@
     if (!session) return;
     if (session.rows != null) $('rows').value = session.rows;
     if (session.cols != null) $('cols').value = session.cols;
-    if (session.rows != null && localStorage.getItem('atr.scrollbackLimitSet') !== 'true') {
-      $('scrollbackLimit').value = session.rows;
-    }
   }
 
   async function refreshSessions() {
@@ -1261,6 +1254,12 @@
     } catch (e) { setServer(false, 'server: ' + e.message); }
   }
 
+  function getScrollbackLimit() {
+    const fromRows = Number($('rows').value) || 30;
+    const fromObs = lastObservation?.screen?.rows;
+    return Math.max(1, typeof fromObs === 'number' ? fromObs : fromRows);
+  }
+
   function updateScrollbackButtons(page, totalPages) {
     const prevBtn = $('scrollbackPrevBtn');
     const nextBtn = $('scrollbackNextBtn');
@@ -1270,21 +1269,22 @@
 
   async function loadScrollback() {
     if (!sid()) { alert('No active session'); return; }
-    const limit = Math.max(1, Math.min(1000, Number($('scrollbackLimit').value) || 200));
+    const limit = getScrollbackLimit();
     const page = Math.max(1, Number($('scrollbackPage').value) || 1);
     const offset = (page - 1) * limit;
-    const tail = offset + limit;
+    const tail = Math.min(offset + limit, 10000);
     try {
       const data = await request(`/sessions/${encodeURIComponent(sid())}/history/scrollback?tail=${tail}&offset=${offset}&limit=${limit}`);
       const lines = data.scrollback || [];
       const total = typeof data.total === 'number' ? data.total : '?';
       const totalPages = typeof total === 'number' ? Math.max(1, Math.ceil(total / limit)) : '?';
-      const end = offset + lines.length;
+      const startLine = offset + 1;
+      const endLine = offset + lines.length;
       const summary = lines.length
-        ? `--- 第 ${offset + 1}–${end} 行 / 共 ${total} 行 (page=${page}, limit=${limit}) ---`
-        : `--- 该范围无历史 (page=${page}, limit=${limit}) / 共 ${total} 行 ---`;
+        ? `--- 第 ${startLine}–${endLine} 行 / 共 ${total} 行 (page=${page}, rows=${limit}) ---`
+        : `--- 该范围无历史 (page=${page}, rows=${limit}) / 共 ${total} 行 ---`;
       $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + '\n' + summary;
-      $('scrollbackRange').textContent = lines.length ? `第 ${page} / ${totalPages} 页 · 第 ${offset + 1}–${end} 行 / 共 ${total} 行` : `第 ${page} / ${totalPages} 页 · 无数据 / 共 ${total} 行`;
+      $('scrollbackRange').textContent = lines.length ? `第 ${page} / ${totalPages} 页 · 第 ${startLine}–${endLine} 行 / 共 ${total} 行` : `第 ${page} / ${totalPages} 页 · 无数据 / 共 ${total} 行`;
       updateScrollbackButtons(page, totalPages);
       showPanel('history');
       showToast(`Loaded ${lines.length} history lines`);
@@ -1382,19 +1382,11 @@
     const urlToken = readUrlToken();
     loadSettings();
     if (urlToken) $('token').value = urlToken;
-    if (localStorage.getItem('atr.scrollbackLimitSet') !== 'true') {
-      const rowsEl = $('rows');
-      const limitEl = $('scrollbackLimit');
-      if (rowsEl && limitEl) limitEl.value = rowsEl.value || 30;
-    }
     saveSettings();
 
     document.addEventListener('input', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
         saveSettings();
-        if (e.target.id === 'scrollbackLimit') {
-          localStorage.setItem('atr.scrollbackLimitSet', 'true');
-        }
       }
     });
     document.addEventListener('keydown', (e) => {
