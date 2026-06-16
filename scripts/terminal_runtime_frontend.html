@@ -470,8 +470,8 @@
         <div class="button-row" style="align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
             <div>
-              <label style="margin-bottom:2px;">每页行数</label>
-              <input id="scrollbackLimit" type="number" value="200" min="1" max="1000" style="width:90px;" />
+              <label style="margin-bottom:2px;">每页行数（建议=Rows）</label>
+              <input id="scrollbackLimit" type="number" value="30" min="1" max="1000" style="width:90px;" />
             </div>
             <div>
               <label style="margin-bottom:2px;">当前页码</label>
@@ -781,6 +781,9 @@
     if (!session) return;
     if (session.rows != null) $('rows').value = session.rows;
     if (session.cols != null) $('cols').value = session.cols;
+    if (session.rows != null && localStorage.getItem('atr.scrollbackLimitSet') !== 'true') {
+      $('scrollbackLimit').value = session.rows;
+    }
   }
 
   async function refreshSessions() {
@@ -1379,11 +1382,19 @@
     const urlToken = readUrlToken();
     loadSettings();
     if (urlToken) $('token').value = urlToken;
+    if (localStorage.getItem('atr.scrollbackLimitSet') !== 'true') {
+      const rowsEl = $('rows');
+      const limitEl = $('scrollbackLimit');
+      if (rowsEl && limitEl) limitEl.value = rowsEl.value || 30;
+    }
     saveSettings();
 
     document.addEventListener('input', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
         saveSettings();
+        if (e.target.id === 'scrollbackLimit') {
+          localStorage.setItem('atr.scrollbackLimitSet', 'true');
+        }
       }
     });
     document.addEventListener('keydown', (e) => {
