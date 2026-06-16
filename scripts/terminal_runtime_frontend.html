@@ -809,6 +809,7 @@
 
   async function selectSession(id, opts = {}) {
     activeSessionId = id;
+    $('scrollbackPage').value = '1';
     lastObservation = sessionObservations[id] || null;
     renderSessionList();
     renderScreenTabs();
@@ -981,6 +982,8 @@
     btn.textContent = 'Refreshing...';
     btn.disabled = true;
     await observe(currentView);
+    $('scrollbackPage').value = '1';
+    $('scrollbackRange').textContent = 'current screen';
     setTimeout(() => {
       btn.textContent = 'Refresh';
       btn.disabled = false;
@@ -1090,7 +1093,11 @@
       const body = {actor: actor(), lock_token: $('lockToken').value.trim() || null, allow_dangerous: allowDangerous, action};
       const data = await request(`/sessions/${encodeURIComponent(sid())}/actions`, {method: 'POST', body: JSON.stringify(body)});
       if (data.requires_approval) alert('Action blocked: ' + data.reason + '\npattern: ' + data.pattern);
-      setTimeout(() => observe('agent'), 120);
+      setTimeout(() => {
+        $('scrollbackPage').value = '1';
+        $('scrollbackRange').textContent = 'current screen';
+        observe('agent');
+      }, 120);
       return data;
     } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
   }
@@ -1259,10 +1266,10 @@
   }
 
   function updateScrollbackButtons(page, totalPages) {
-    const prevBtn = $('scrollbackPrevBtn');
-    const nextBtn = $('scrollbackNextBtn');
-    if (prevBtn) prevBtn.disabled = page <= 1;
-    if (nextBtn) nextBtn.disabled = page >= totalPages;
+    const prevBtn = $('scrollbackPrevBtn'); // ← Older
+    const nextBtn = $('scrollbackNextBtn'); // Newer →
+    if (prevBtn) prevBtn.disabled = page >= totalPages;
+    if (nextBtn) nextBtn.disabled = page <= 1;
   }
 
   async function loadScrollback() {
@@ -1331,6 +1338,10 @@
 
   $('inputText').addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendSubmit(false);
+  });
+
+  $('scrollbackPage').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') loadScrollback();
   });
 
   let isComposing = false;
