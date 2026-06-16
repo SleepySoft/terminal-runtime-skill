@@ -13,7 +13,7 @@ Install:
   python -m pip install fastapi uvicorn pyte pydantic
 
 Run:
-  python agent_terminal_runtime.py
+  python terminal_runtime_service.py
   # or
   uvicorn agent_terminal_runtime:app --host 127.0.0.1 --port 18650
 
@@ -82,7 +82,7 @@ DEFAULT_EVENT_LIMIT = int(os.environ.get("ATR_EVENT_LIMIT", "2000"))
 DEFAULT_IDLE_TTL_SEC = int(os.environ.get("ATR_IDLE_TTL_SEC", "0"))  # 0 disables cleanup
 
 BASE_DIR = Path(__file__).resolve().parent
-UI_FILE = BASE_DIR / "terminal_debug_pro.html"
+UI_FILE = BASE_DIR / "terminal_runtime_frontend.html"
 
 # =============================================================================
 # Models
