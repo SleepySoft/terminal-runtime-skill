@@ -1084,11 +1084,13 @@ def scrollback(
 ) -> Dict[str, Any]:
     require_auth(authorization)
     s = get_session_or_404(session_id)
+    with s.lock:
+        total = len(s.scrollback)
     lines = s.get_scrollback(max(tail, offset + limit))
     if offset:
         lines = lines[offset:]
     lines = lines[:limit]
-    return {"session_id": session_id, "scrollback": lines, "offset": offset, "limit": limit}
+    return {"session_id": session_id, "scrollback": lines, "offset": offset, "limit": limit, "total": total}
 
 
 @app.post("/sessions/{session_id}/history/reset")
