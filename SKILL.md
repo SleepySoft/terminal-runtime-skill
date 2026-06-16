@@ -21,6 +21,8 @@ Client 脚本：
 
 该脚本调用 Runtime 的 HTTP API，返回 JSON 或纯文本。
 
+如果服务启用了 `ATR_API_TOKEN`，client 脚本会自动读取该环境变量并携带鉴权头，无需额外处理。
+
 服务的默认地址为：
 
 ```text
@@ -89,7 +91,7 @@ ATR 只监控它**直接启动**的进程。创建 session 时必须把目标程
 
 ## 详细用法
 
-工具调用示例、Observation 字段解释、Shell/TUI/CLI Agent 行为、安全规则以及 `dialog` 测试用例见：
+工具调用示例、Observation 字段解释、Shell/TUI/CLI Agent 行为以及 `dialog` 测试用例见：
 
 ```text
 {baseDir}/references/dialog.md

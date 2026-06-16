@@ -46,6 +46,16 @@ Windows的console机制和POSIX的完全不一样，理论上本程序在Windows
 
 由于第一次写SKILL并且主要是AI代劳，所以我认为不大理想。后续我会持续改进，以后这个仓库就是一个SKILL。
 
+## 使用方法
+
+#### 人类使用
+
+这个项目不仅可以作为Agent的Skill，它也可以作为一个无头终端的工具。
+
+使用方法很简单：安装 [requirements.txt](requirements.txt) 中的依赖并启动 [terminal_runtime_client.py](scripts/terminal_runtime_client.py) 即可。
+
+服务默认运行在18650端口，。
+
 
 ## 以下是AI生成的说明
 
