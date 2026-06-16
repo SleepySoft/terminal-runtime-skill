@@ -73,23 +73,16 @@ Windows的console机制和POSIX的完全不一样，理论上本程序在Windows
 ## 2. 文件说明
 
 ```text
-terminal_runtime/                      # 服务端核心包
-  api.py                               # FastAPI 路由与生命周期
-  session.py                           # 单个 PTY 会话生命周期
-  registry.py                          # 会话注册表与清理
-  encoding.py                          # 动作编码
-  mode_tracker.py                      # 终端模式追踪
-  state_detector.py                    # 屏幕状态检测
-  security.py                          # 危险命令检测
-  config.py                            # 配置
-  models.py                            # 数据模型
-  main.py                              # 启动入口
 scripts/
-  agent_terminal_runtime.py            # 兼容启动脚本
-  atr.py                               # 命令行 helper
-  terminal_debug_pro.html              # 独立前端调试页面
+  terminal_runtime_service.py          # 服务端主程序
+  terminal_runtime_client.py           # 命令行 helper
+  terminal_runtime_frontend.html       # 独立前端调试页面
+references/
+  dialog.md                            # 工具用法与示例
 requirements.txt                       # Python 依赖
 pyproject.toml                         # 项目配置与测试配置
+tests/                                 # pytest 测试
+SKILL.md                               # Skill 说明
 README.md                              # 本文档
 ```
 
@@ -121,8 +114,6 @@ python -m pip install -e ".[dev]"
 
 ```bash
 python scripts/terminal_runtime_service.py
-# 或者
-python -m terminal_runtime.main
 ```
 
 默认地址：
@@ -152,7 +143,7 @@ export ATR_IDLE_TTL_SEC=0
 export ATR_RAW_LOG_LIMIT=4000
 export ATR_AUDIT_LIMIT=2000
 export ATR_EVENT_LIMIT=2000
-python terminal_runtime_service.py
+python scripts/terminal_runtime_service.py
 ```
 
 说明：
@@ -179,7 +170,7 @@ WebSocket 需要：
 因为后端已启用 CORS，最简单方式是直接用浏览器打开：
 
 ```text
-terminal_debug_pro.html
+terminal_runtime_frontend.html
 ```
 
 页面顶部设置：
@@ -199,7 +190,7 @@ python -m http.server 8080
 然后打开：
 
 ```text
-http://127.0.0.1:8080/terminal_debug_pro.html
+http://127.0.0.1:8080/terminal_runtime_frontend.html
 ```
 
 ### 6.3 方式 C：通过服务访问
@@ -827,7 +818,7 @@ http://<WSL_IP>:18650
 
 ```bash
 export ATR_HOST=0.0.0.0
-python terminal_runtime_service.py
+python scripts/terminal_runtime_service.py
 ```
 
 ### TUI 程序方向键异常

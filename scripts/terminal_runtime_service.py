@@ -15,7 +15,7 @@ Install:
 Run:
   python terminal_runtime_service.py
   # or
-  uvicorn agent_terminal_runtime:app --host 127.0.0.1 --port 18650
+  uvicorn terminal_runtime_service:app --host 127.0.0.1 --port 18650
 
 Core primitives:
   observe / act / wait / events

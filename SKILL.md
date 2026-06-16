@@ -13,12 +13,13 @@ description: 通过 observe / act / wait 原语控制持久化的虚拟终端会
 observe -> decide -> act -> wait -> observe again
 ```
 
-Client脚本：
+Client 脚本：
 
 ```text
 {baseDir}/scripts/terminal_runtime_client.py
-该脚本调用 Runtime 的 HTTP API，返回 JSON 或纯文本。
 ```
+
+该脚本调用 Runtime 的 HTTP API，返回 JSON 或纯文本。
 
 服务的默认地址为：
 
