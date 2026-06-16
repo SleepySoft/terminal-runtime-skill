@@ -476,8 +476,8 @@
             <span id="scrollbackRange" class="pill" style="background:transparent;border:none;padding-left:0; margin-bottom:8px;">-</span>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="scrollbackPrevBtn" class="secondary" onclick="loadScrollbackPrev()">← Prev</button>
-            <button id="scrollbackNextBtn" class="secondary" onclick="loadScrollbackNext()">Next →</button>
+            <button id="scrollbackPrevBtn" class="secondary" onclick="loadScrollbackPrev()">← Older</button>
+            <button id="scrollbackNextBtn" class="secondary" onclick="loadScrollbackNext()">Newer →</button>
             <button class="secondary" onclick="showCurrentScreen()">Current Screen</button>
             <button class="secondary" onclick="loadScrollback()">Refresh</button>
             <button class="danger small" onclick="resetScrollback()">Clear</button>
@@ -1290,13 +1290,13 @@
 
   function loadScrollbackNext() {
     const page = Math.max(1, Number($('scrollbackPage').value) || 1);
-    $('scrollbackPage').value = page + 1;
+    $('scrollbackPage').value = Math.max(1, page - 1);
     loadScrollback();
   }
 
   function loadScrollbackPrev() {
     const page = Math.max(1, Number($('scrollbackPage').value) || 1);
-    $('scrollbackPage').value = Math.max(1, page - 1);
+    $('scrollbackPage').value = page + 1;
     loadScrollback();
   }
 
