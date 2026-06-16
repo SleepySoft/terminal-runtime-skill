@@ -466,7 +466,7 @@
       </div>
 
       <div class="control-group">
-        <label>Scrollback History（越大的“起始行号”代表越旧的历史）</label>
+        <label>Scrollback History</label>
         <div class="button-row" style="align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px;">
           <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
             <div>
@@ -474,14 +474,14 @@
               <input id="scrollbackLimit" type="number" value="200" min="1" max="1000" style="width:90px;" />
             </div>
             <div>
-              <label style="margin-bottom:2px;">起始行号</label>
-              <input id="scrollbackOffset" type="number" value="0" min="0" style="width:90px;" />
+              <label style="margin-bottom:2px;">当前页码</label>
+              <input id="scrollbackPage" type="number" value="1" min="1" style="width:90px;" />
             </div>
             <span id="scrollbackRange" class="pill" style="background:transparent;border:none;padding-left:0; margin-bottom:8px;">-</span>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button id="scrollbackPrevBtn" class="secondary" onclick="loadScrollbackPrev()">← Newer</button>
-            <button id="scrollbackNextBtn" class="secondary" onclick="loadScrollbackNext()">Older →</button>
+            <button id="scrollbackPrevBtn" class="secondary" onclick="loadScrollbackPrev()">← Prev</button>
+            <button id="scrollbackNextBtn" class="secondary" onclick="loadScrollbackNext()">Next →</button>
             <button class="secondary" onclick="jumpToLatestScrollback()">Latest</button>
             <button class="secondary" onclick="loadScrollback()">Refresh</button>
             <button class="danger small" onclick="resetScrollback()">Clear</button>
@@ -680,7 +680,7 @@
   function closeCreateModal() { $('createOverlay').style.display = 'none'; }
 
   function saveSettings() {
-    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackOffset','scrollbackLimit'];
+    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackPage','scrollbackLimit'];
     const obj = {};
     for (const id of ids) {
       const el = $(id);
@@ -1258,50 +1258,50 @@
     } catch (e) { setServer(false, 'server: ' + e.message); }
   }
 
-  function updateScrollbackButtons(offset, limit, total) {
+  function updateScrollbackButtons(page, totalPages) {
     const prevBtn = $('scrollbackPrevBtn');
     const nextBtn = $('scrollbackNextBtn');
-    if (prevBtn) prevBtn.disabled = offset <= 0;
-    if (nextBtn) nextBtn.disabled = typeof total === 'number' && offset + limit >= total;
+    if (prevBtn) prevBtn.disabled = page <= 1;
+    if (nextBtn) nextBtn.disabled = page >= totalPages;
   }
 
   async function loadScrollback() {
     if (!sid()) { alert('No active session'); return; }
-    const offset = Math.max(0, Number($('scrollbackOffset').value) || 0);
     const limit = Math.max(1, Math.min(1000, Number($('scrollbackLimit').value) || 200));
+    const page = Math.max(1, Number($('scrollbackPage').value) || 1);
+    const offset = (page - 1) * limit;
     const tail = offset + limit;
     try {
       const data = await request(`/sessions/${encodeURIComponent(sid())}/history/scrollback?tail=${tail}&offset=${offset}&limit=${limit}`);
       const lines = data.scrollback || [];
       const total = typeof data.total === 'number' ? data.total : '?';
+      const totalPages = typeof total === 'number' ? Math.max(1, Math.ceil(total / limit)) : '?';
       const end = offset + lines.length;
       const summary = lines.length
-        ? `--- 第 ${offset + 1}–${end} 行 / 共 ${total} 行 (offset=${offset}, limit=${limit}) ---`
-        : `--- 该范围无历史 (offset=${offset}, limit=${limit}) / 共 ${total} 行 ---`;
+        ? `--- 第 ${offset + 1}–${end} 行 / 共 ${total} 行 (page=${page}, limit=${limit}) ---`
+        : `--- 该范围无历史 (page=${page}, limit=${limit}) / 共 ${total} 行 ---`;
       $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + '\n' + summary;
-      $('scrollbackRange').textContent = lines.length ? `第 ${offset + 1}–${end} 行 / 共 ${total} 行` : `无数据 / 共 ${total} 行`;
-      updateScrollbackButtons(offset, limit, data.total);
+      $('scrollbackRange').textContent = lines.length ? `第 ${page} / ${totalPages} 页 · 第 ${offset + 1}–${end} 行 / 共 ${total} 行` : `第 ${page} / ${totalPages} 页 · 无数据 / 共 ${total} 行`;
+      updateScrollbackButtons(page, totalPages);
       showPanel('history');
       showToast(`Loaded ${lines.length} history lines`);
     } catch (e) { setServer(false, 'server: ' + e.message); showToast('Load history failed: ' + e.message, true); }
   }
 
   function loadScrollbackNext() {
-    const limit = Math.max(1, Number($('scrollbackLimit').value) || 200);
-    const offset = (Number($('scrollbackOffset').value) || 0) + limit;
-    $('scrollbackOffset').value = offset;
+    const page = Math.max(1, Number($('scrollbackPage').value) || 1);
+    $('scrollbackPage').value = page + 1;
     loadScrollback();
   }
 
   function loadScrollbackPrev() {
-    const limit = Math.max(1, Number($('scrollbackLimit').value) || 200);
-    const offset = Math.max(0, (Number($('scrollbackOffset').value) || 0) - limit);
-    $('scrollbackOffset').value = offset;
+    const page = Math.max(1, Number($('scrollbackPage').value) || 1);
+    $('scrollbackPage').value = Math.max(1, page - 1);
     loadScrollback();
   }
 
   function jumpToLatestScrollback() {
-    $('scrollbackOffset').value = '0';
+    $('scrollbackPage').value = '1';
     loadScrollback();
   }
 
@@ -1311,9 +1311,9 @@
     try {
       await request(`/sessions/${encodeURIComponent(sid())}/history/reset?actor=${encodeURIComponent(actor())}`, {method: 'POST'});
       $('historyPanel').textContent = '';
-      $('scrollbackOffset').value = '0';
+      $('scrollbackPage').value = '1';
       $('scrollbackRange').textContent = '-';
-      updateScrollbackButtons(0, Number($('scrollbackLimit').value) || 200, 0);
+      updateScrollbackButtons(1, 1);
       showToast('Scrollback cleared');
     } catch (e) { setServer(false, 'server: ' + e.message); showToast('Clear history failed: ' + e.message, true); }
   }
