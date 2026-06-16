@@ -464,6 +464,23 @@
         </div>
       </div>
 
+      <div class="control-group">
+        <label>Scrollback</label>
+        <div class="button-row" style="align-items:center; justify-content:space-between; flex-wrap:wrap;">
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <input id="scrollbackTail" type="number" value="200" min="1" max="10000" title="Tail lines" style="width:80px;" />
+            <input id="scrollbackOffset" type="number" value="0" min="0" title="Offset" style="width:80px;" />
+            <input id="scrollbackLimit" type="number" value="200" min="1" max="1000" title="Limit" style="width:80px;" />
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="secondary" onclick="loadScrollback()">Load History</button>
+            <button class="secondary" onclick="loadScrollbackPrev()">← Prev</button>
+            <button class="secondary" onclick="loadScrollbackNext()">Next →</button>
+            <button class="danger small" onclick="resetScrollback()">Reset</button>
+          </div>
+        </div>
+      </div>
+
       <div style="min-height:26px;">
         <span id="screenToast" class="pill" style="display:none;"></span>
       </div>
@@ -590,10 +607,12 @@
         <button id="tab-json" class="secondary tab-active" onclick="showPanel('json')">Observation JSON</button>
         <button id="tab-events" class="secondary" onclick="showPanel('events')">Events</button>
         <button id="tab-logs" class="secondary" onclick="showPanel('logs')">Logs</button>
+        <button id="tab-history" class="secondary" onclick="showPanel('history')">History</button>
       </div>
       <pre id="jsonPanel" class="panel"></pre>
       <pre id="eventsPanel" class="panel" style="display:none"></pre>
       <pre id="logsPanel" class="panel" style="display:none"></pre>
+      <pre id="historyPanel" class="panel" style="display:none"></pre>
     </div>
   </section>
 </main>
@@ -653,7 +672,7 @@
   function closeCreateModal() { $('createOverlay').style.display = 'none'; }
 
   function saveSettings() {
-    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText'];
+    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackTail','scrollbackOffset','scrollbackLimit'];
     const obj = {};
     for (const id of ids) {
       const el = $(id);
@@ -687,7 +706,7 @@
 
   function showPanel(name) {
     activePanel = name;
-    for (const n of ['json', 'events', 'logs']) {
+    for (const n of ['json', 'events', 'logs', 'history']) {
       $('tab-' + n).classList.toggle('tab-active', n === name);
       $(n + 'Panel').style.display = n === name ? 'block' : 'none';
     }
@@ -1229,6 +1248,44 @@
       $('logsPanel').textContent = data.raw_tail || JSON.stringify(data, null, 2);
       showPanel('logs');
     } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  async function loadScrollback() {
+    if (!sid()) { alert('No active session'); return; }
+    const tail = Number($('scrollbackTail').value) || 200;
+    const offset = Number($('scrollbackOffset').value) || 0;
+    const limit = Number($('scrollbackLimit').value) || 200;
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/history/scrollback?tail=${tail}&offset=${offset}&limit=${limit}`);
+      const lines = data.scrollback || [];
+      $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + `\n--- offset=${data.offset} limit=${data.limit} returned=${lines.length} ---`;
+      showPanel('history');
+      showToast(`Loaded ${lines.length} history lines`);
+    } catch (e) { setServer(false, 'server: ' + e.message); showToast('Load history failed: ' + e.message, true); }
+  }
+
+  function loadScrollbackNext() {
+    const limit = Number($('scrollbackLimit').value) || 200;
+    $('scrollbackOffset').value = (Number($('scrollbackOffset').value) || 0) + limit;
+    loadScrollback();
+  }
+
+  function loadScrollbackPrev() {
+    const limit = Number($('scrollbackLimit').value) || 200;
+    const offset = Math.max(0, (Number($('scrollbackOffset').value) || 0) - limit);
+    $('scrollbackOffset').value = offset;
+    loadScrollback();
+  }
+
+  async function resetScrollback() {
+    if (!sid()) { alert('No active session'); return; }
+    if (!confirm('Clear scrollback history for session ' + sid() + '?')) return;
+    try {
+      await request(`/sessions/${encodeURIComponent(sid())}/history/reset?actor=${encodeURIComponent(actor())}`, {method: 'POST'});
+      $('historyPanel').textContent = '';
+      $('scrollbackOffset').value = '0';
+      showToast('Scrollback reset');
+    } catch (e) { setServer(false, 'server: ' + e.message); showToast('Reset history failed: ' + e.message, true); }
   }
 
   async function copyScreen() {
