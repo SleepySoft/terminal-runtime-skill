@@ -1,0 +1,1318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Agent Terminal Runtime Pro Debugger</title>
+  <style>
+    :root {
+      --bg: #08111f;
+      --panel: #111827;
+      --panel2: #0f172a;
+      --panel3: #020617;
+      --text: #dbeafe;
+      --muted: #94a3b8;
+      --border: #263449;
+      --accent: #60a5fa;
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #eab308;
+      --purple: #a78bfa;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #08111f 0%, #0b1020 100%);
+      color: var(--text);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    header {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.96);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    h1 { font-size: 18px; margin: 0; }
+    .subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+    .session-list-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(15, 23, 42, 0.96);
+      overflow-x: auto;
+    }
+    .session-list {
+      display: flex;
+      gap: 10px;
+      flex: 1;
+      min-width: 0;
+    }
+    .session-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 11px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #0f172a;
+      cursor: pointer;
+      min-width: 170px;
+      max-width: 240px;
+      flex-shrink: 0;
+      transition: border-color .15s, background .15s;
+    }
+    .session-item:hover { background: #162032; }
+    .session-item.active {
+      border-color: var(--accent);
+      background: #1e293b;
+      box-shadow: 0 0 0 1px rgba(96,165,250,.25);
+    }
+    .session-item .info { min-width: 0; }
+    .session-item .title {
+      font-weight: 650;
+      font-size: 13px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-item .meta {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .session-item .state-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--muted);
+    }
+    .session-item .state-dot.running { background: var(--green); box-shadow: 0 0 6px var(--green); }
+    .session-item .state-dot.error { background: var(--red); }
+    .session-item .close {
+      margin-left: auto;
+      padding: 2px 6px;
+      font-size: 15px;
+      line-height: 1;
+      background: transparent;
+      color: var(--muted);
+      border-radius: 6px;
+    }
+    .session-item .close:hover { color: var(--red); background: rgba(239,68,68,.12); }
+
+    main {
+      display: grid;
+      grid-template-columns: 390px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
+    }
+    .card {
+      background: rgba(17, 24, 39, 0.96);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 10px 30px rgba(0,0,0,.22);
+    }
+    .stack { display: flex; flex-direction: column; gap: 12px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+    input, textarea, select {
+      width: 100%;
+      background: #07101f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+      font-family: inherit;
+    }
+    textarea { min-height: 82px; resize: vertical; }
+    input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+    button {
+      background: #1d4ed8;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 8px 11px;
+      cursor: pointer;
+      font-weight: 650;
+    }
+    button:hover { background: #2563eb; }
+    button.secondary { background: #263348; }
+    button.secondary:hover { background: #334155; }
+    button.danger { background: #b91c1c; }
+    button.danger:hover { background: #dc2626; }
+    button.warn { background: #a16207; }
+    button.warn:hover { background: #ca8a04; }
+    button.small { padding: 6px 8px; font-size: 12px; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 8px; }
+    .statusbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .pill {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 3px 8px;
+      background: #0f172a;
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+    .ok { color: var(--green); }
+    .bad { color: var(--red); }
+    .warn-text { color: var(--yellow); }
+    .purple { color: var(--purple); }
+    .terminal-wrap {
+      position: relative;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid #263449;
+      background: #020617;
+    }
+    .terminal-wrap:focus-within {
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+    .terminal-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: #0f172a;
+      border-bottom: 1px solid #263449;
+      color: var(--muted);
+      font-size: 12px;
+      gap: 10px;
+    }
+    .screen-tabs {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      flex: 1;
+      min-width: 0;
+    }
+    .screen-tab {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 8px;
+      background: #1e293b;
+      border: 1px solid var(--border);
+      font-size: 12px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s;
+    }
+    .screen-tab:hover { background: #334155; }
+    .screen-tab.active {
+      background: var(--accent);
+      color: #0f172a;
+      border-color: var(--accent);
+      font-weight: 650;
+    }
+    .screen-tab .close {
+      padding: 0 3px;
+      font-size: 13px;
+      line-height: 1;
+      background: transparent;
+      color: inherit;
+      opacity: .7;
+    }
+    .screen-tab .close:hover { opacity: 1; color: var(--red); }
+    #screen {
+      margin: 0;
+      padding: 14px;
+      height: calc(100vh - 295px);
+      min-height: 390px;
+      overflow: auto;
+      white-space: pre;
+      color: #e5e7eb;
+      font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      background: #020617;
+      outline: none;
+      position: relative;
+      z-index: 1;
+    }
+    .screen-input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      padding: 14px;
+      opacity: 0;
+      z-index: 2;
+      background: transparent;
+      color: transparent;
+      border: none;
+      border-radius: 0;
+      resize: none;
+      min-height: 0;
+      outline: none;
+      pointer-events: none;
+      overflow: hidden;
+      font: 14px/1.35 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      cursor: default;
+    }
+    pre.panel {
+      margin: 0;
+      max-height: 300px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-size: 12px;
+      color: #cbd5e1;
+      background: #07101f;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+    }
+    .tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+    .tab-active { background: #2563eb !important; }
+    .hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+    .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+    .mode-on { color: var(--green); }
+    .mode-off { color: var(--muted); }
+    .settings-overlay, .create-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.78);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+    }
+    .settings-panel, .create-panel {
+      width: min(440px, calc(100vw - 32px));
+    }
+    .auto-mode-select {
+      background: #07101f;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      outline: none;
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .auto-mode-select:focus { border-color: var(--accent); }
+    .auto-mode-select.mode-polling { border-color: var(--accent); }
+    .auto-mode-select.mode-websocket { border-color: var(--green); }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .segmented-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .segmented-toggle .view-toggle {
+      border-radius: 0;
+      border: none;
+      border-right: 1px solid var(--border);
+      background: #0f172a;
+      color: var(--text);
+      margin: 0;
+    }
+    .segmented-toggle .view-toggle:last-child { border-right: none; }
+    .segmented-toggle .view-toggle.active {
+      background: #2563eb;
+      color: white;
+    }
+    .segmented-toggle .view-toggle:not(.active):hover {
+      background: #1e293b;
+    }
+    .screen-status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .status-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .status-item label { margin-bottom: 0; }
+    #screenToast, #lockTakeoverToast {
+      background: rgba(30, 58, 138, 0.92);
+      color: #fff;
+      transition: opacity .2s;
+    }
+    @media (max-width: 1080px) {
+      header { grid-template-columns: 1fr; }
+      main { grid-template-columns: 1fr; }
+      #screen { height: 55vh; }
+      .session-item { min-width: 140px; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Agent Terminal Runtime Pro Debugger</h1>
+  </div>
+  <div class="statusbar">
+    <span class="pill" id="serverStatus">server: unknown</span>
+    <span class="pill" id="wsStatus">ws: disconnected</span>
+    <span class="pill" id="sessionStatus">session: -</span>
+    <button class="secondary small" onclick="openSettings()" title="Settings">⚙️</button>
+  </div>
+</header>
+
+<div id="settingsOverlay" class="settings-overlay" style="display:none" onclick="if(event.target===this) closeSettings()">
+  <div class="settings-panel card stack" onclick="event.stopPropagation()">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <strong>Settings</strong>
+      <button class="secondary small" onclick="closeSettings()">Close</button>
+    </div>
+    <div>
+      <label>API Base</label>
+      <input id="apiBase" value="http://127.0.0.1:18650" />
+    </div>
+    <div>
+      <label>Token，可留空</label>
+      <input id="token" type="password" placeholder="ATR_API_TOKEN" />
+    </div>
+    <div class="hint">API Base 默认从当前页面 URL 推断。Token 可通过 URL 参数 ?token=xxx 传入。</div>
+  </div>
+</div>
+
+<div id="createOverlay" class="create-overlay" style="display:none" onclick="if(event.target===this) closeCreateModal()">
+  <div class="create-panel card stack" onclick="event.stopPropagation()">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <strong>New Session</strong>
+      <button class="secondary small" onclick="closeCreateModal()">Close</button>
+    </div>
+    <div>
+      <label>Session ID（留空自动生成）</label>
+      <input id="createId" placeholder="kimi-dev" />
+    </div>
+    <div>
+      <label>Command</label>
+      <input id="createCommand" value="bash" />
+    </div>
+    <div class="row3">
+      <div><label>Rows</label><input id="createRows" type="number" value="30" /></div>
+      <div><label>Cols</label><input id="createCols" type="number" value="100" /></div>
+      <div><label>Owner</label><input id="createOwner" value="openclaw" /></div>
+    </div>
+    <div>
+      <label>Purpose</label>
+      <input id="createPurpose" value="debug terminal runtime" />
+    </div>
+    <div class="button-row" style="justify-content:flex-end;">
+      <button class="secondary" onclick="closeCreateModal()">Cancel</button>
+      <button onclick="createSessionFromModal()">Create</button>
+    </div>
+  </div>
+</div>
+
+<section class="session-list-bar">
+  <div id="sessionList" class="session-list"></div>
+  <button class="secondary small" onclick="openCreateModal()" title="New session" style="font-size:18px;line-height:1;padding:4px 10px;">+</button>
+</section>
+
+<main>
+  <section class="stack">
+    <div class="card stack">
+      <strong>Operator</strong>
+      <div class="row3">
+        <div><label>Actor</label><input id="actor" value="openclaw" /></div>
+        <div><label>Rows</label><input id="rows" type="number" value="30" /></div>
+        <div><label>Cols</label><input id="cols" type="number" value="100" /></div>
+      </div>
+    </div>
+
+    <div class="card stack" id="screenControlCard">
+      <strong>Screen</strong>
+
+      <div class="control-group">
+        <label>Refresh</label>
+        <div class="button-row" style="align-items:center; justify-content:space-between; flex-wrap:wrap;">
+          <select id="autoMode" class="auto-mode-select" onchange="setAutoMode(this.value)">
+            <option value="off">Auto: Off</option>
+            <option value="polling">Auto: Polling</option>
+            <option value="websocket">Auto: WebSocket</option>
+          </select>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <button id="refreshBtn" onclick="refreshScreen()">Manual Refresh</button>
+            <span class="pill" id="lastUpdated">Last updated: -</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="control-group">
+        <label>View mode</label>
+        <div class="button-row" style="align-items:center; justify-content:space-between; flex-wrap:wrap;">
+          <div class="segmented-toggle">
+            <button id="viewAgent" class="view-toggle active" onclick="setView('agent')">Agent</button>
+            <button id="viewDebug" class="view-toggle secondary" onclick="setView('debug')">Debug</button>
+          </div>
+          <button class="secondary" onclick="screenshot()">Text Screenshot</button>
+        </div>
+      </div>
+
+      <div style="min-height:26px;">
+        <span id="screenToast" class="pill" style="display:none;"></span>
+      </div>
+
+      <div class="screen-status-grid">
+        <div class="status-item">
+          <label>State</label>
+          <span id="statusState" class="pill">-</span>
+        </div>
+        <div class="status-item">
+          <label>PID</label>
+          <span id="statusPid" class="pill">-</span>
+        </div>
+        <div class="status-item">
+          <label>Update seq</label>
+          <span id="statusSeq" class="pill">-</span>
+        </div>
+        <div class="status-item">
+          <label>Stable for</label>
+          <span id="statusStable" class="pill">-</span>
+        </div>
+        <div class="status-item">
+          <label>Cursor</label>
+          <span id="statusCursor" class="pill">-</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <strong>Act</strong>
+      <div>
+        <label>输入文本，Ctrl+Enter = Submit</label>
+        <textarea id="inputText" placeholder="echo hello && pwd && ls"></textarea>
+      </div>
+      <div class="button-row">
+        <button onclick="sendSubmit()">Submit</button>
+        <button class="secondary" onclick="sendText()">Text</button>
+        <button class="secondary" onclick="sendPaste()">Paste</button>
+        <button class="warn" onclick="sendSubmit(true)">Submit Dangerous</button>
+      </div>
+      <div class="button-row">
+        <button class="small secondary" onclick="sendKey('UP')">↑</button>
+        <button class="small secondary" onclick="sendKey('DOWN')">↓</button>
+        <button class="small secondary" onclick="sendKey('LEFT')">←</button>
+        <button class="small secondary" onclick="sendKey('RIGHT')">→</button>
+        <button class="small secondary" onclick="sendKey('TAB')">Tab</button>
+        <button class="small secondary" onclick="sendKey('SHIFT_TAB')">S-Tab</button>
+        <button class="small secondary" onclick="sendKey('ENTER')">Enter</button>
+        <button class="small secondary" onclick="sendKey('ESC')">Esc</button>
+        <button class="small danger" onclick="sendControl('CTRL_C')">Ctrl+C</button>
+        <button class="small danger" onclick="sendControl('CTRL_D')">Ctrl+D</button>
+        <button class="small secondary" onclick="sendControl('CTRL_L')">Ctrl+L</button>
+      </div>
+      <div class="button-row">
+        <button class="small secondary" onclick="sendKey('F1')">F1</button>
+        <button class="small secondary" onclick="sendKey('F2')">F2</button>
+        <button class="small secondary" onclick="sendKey('F3')">F3</button>
+        <button class="small secondary" onclick="sendKey('F4')">F4</button>
+        <button class="small secondary" onclick="sendKey('F5')">F5</button>
+        <button class="small secondary" onclick="sendKey('F10')">F10</button>
+      </div>
+      <div class="row">
+        <button class="secondary" onclick="resizeSession()">Resize</button>
+        <button class="secondary" onclick="copyScreen()">Copy Screen</button>
+      </div>
+      <div class="hint">提示：点击右侧虚拟屏幕即可聚焦输入，支持中英文输入、粘贴（Ctrl+V / Cmd+V）、方向键、Enter/Esc/Tab/Backspace/Delete。不支持 Ctrl/Alt/Meta 组合键及 F1-F10 等功能键，这些请使用上方按钮。</div>
+    </div>
+
+    <div class="card stack">
+      <strong>Lock / Takeover</strong>
+
+      <div class="control-group">
+        <label>Lock</label>
+        <div class="button-row">
+          <button onclick="acquireLock()">Acquire Lock</button>
+          <button class="secondary" onclick="releaseLock()">Release Lock</button>
+        </div>
+        <div>
+          <label>Lock Token</label>
+          <input id="lockToken" placeholder="acquire 后自动填充" />
+        </div>
+        <div class="hint" id="lockStatus">Lock: free</div>
+      </div>
+
+      <div class="control-group">
+        <label>Takeover</label>
+        <div class="button-row">
+          <button class="warn" onclick="startTakeover()">Human Takeover</button>
+          <button class="secondary" onclick="endTakeover()">End Takeover</button>
+        </div>
+        <div style="min-height:26px;">
+          <span id="lockTakeoverToast" class="pill" style="display:none;"></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card stack">
+      <strong>Logs</strong>
+      <div class="button-row">
+        <button class="secondary" onclick="loadAudit()">Audit</button>
+        <button class="secondary" onclick="loadEvents()">Recent Events</button>
+        <button class="secondary" onclick="loadRaw()">Raw Log</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="stack">
+    <div class="terminal-wrap">
+      <div class="terminal-head">
+        <div id="screenTabs" class="screen-tabs"></div>
+        <span id="detected">detected: -</span>
+      </div>
+      <pre id="screen" tabindex="0"></pre>
+      <textarea id="screenInput" class="screen-input" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off"></textarea>
+    </div>
+
+    <div class="card stack">
+      <strong>Input Modes</strong>
+      <div id="modes" class="mode-grid"></div>
+    </div>
+
+    <div class="card stack">
+      <div class="tabs">
+        <button id="tab-json" class="secondary tab-active" onclick="showPanel('json')">Observation JSON</button>
+        <button id="tab-events" class="secondary" onclick="showPanel('events')">Events</button>
+        <button id="tab-logs" class="secondary" onclick="showPanel('logs')">Logs</button>
+      </div>
+      <pre id="jsonPanel" class="panel"></pre>
+      <pre id="eventsPanel" class="panel" style="display:none"></pre>
+      <pre id="logsPanel" class="panel" style="display:none"></pre>
+    </div>
+  </section>
+</main>
+
+<script>
+  let ws = null;
+  let lastObservation = null;
+  let activePanel = 'json';
+  let sessions = [];
+  let activeSessionId = '';
+  let sessionObservations = {};
+  let currentView = 'agent';
+  let autoMode = 'off';
+  let pollInterval = null;
+  let currentControl = null;
+
+  const $ = (id) => document.getElementById(id);
+  const sid = () => activeSessionId;
+  const actor = () => $('actor').value.trim() || 'anonymous';
+  const apiBase = () => $('apiBase').value.replace(/\/$/, '');
+  const token = () => $('token').value.trim();
+
+  function headers() {
+    const h = {'Content-Type': 'application/json'};
+    if (token()) h['Authorization'] = 'Bearer ' + token();
+    return h;
+  }
+
+  function wsUrl(path) {
+    const base = apiBase();
+    const url = new URL(base + path);
+    url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
+    if (token()) url.searchParams.set('token', token());
+    return url.toString();
+  }
+
+  function setPill(id, cls, text) {
+    $(id).className = 'pill ' + cls;
+    $(id).textContent = text;
+  }
+
+  function setServer(ok, text) { setPill('serverStatus', ok ? 'ok' : 'bad', text || (ok ? 'server: ok' : 'server: error')); }
+  function setWs(status) { setPill('wsStatus', status === 'connected' ? 'ok' : status === 'error' ? 'bad' : 'warn-text', 'ws: ' + status); }
+
+  function inferApiBase() {
+    const loc = window.location;
+    return (loc.origin + loc.pathname.replace(/\/ui\/?$/, '')).replace(/\/$/, '');
+  }
+
+  function readUrlToken() {
+    return new URLSearchParams(window.location.search).get('token') || '';
+  }
+
+  function openSettings() { $('settingsOverlay').style.display = 'flex'; }
+  function closeSettings() { $('settingsOverlay').style.display = 'none'; }
+  function openCreateModal() { $('createOverlay').style.display = 'flex'; }
+  function closeCreateModal() { $('createOverlay').style.display = 'none'; }
+
+  function saveSettings() {
+    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText'];
+    const obj = {};
+    for (const id of ids) {
+      const el = $(id);
+      if (el) obj[id] = el.value;
+    }
+    localStorage.setItem('atr.settings', JSON.stringify(obj));
+  }
+
+  function loadSettings() {
+    const raw = localStorage.getItem('atr.settings');
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    for (const [id, val] of Object.entries(s)) {
+      const el = $(id);
+      if (el && val != null) el.value = val;
+    }
+  }
+
+  async function request(path, options = {}) {
+    const res = await fetch(apiBase() + path, {
+      headers: {...headers(), ...(options.headers || {})},
+      ...options,
+    });
+    const txt = await res.text();
+    let data;
+    try { data = txt ? JSON.parse(txt) : {}; } catch { data = {text: txt}; }
+    if (!res.ok) throw new Error(data.detail || txt || res.statusText);
+    setServer(true);
+    return data;
+  }
+
+  function showPanel(name) {
+    activePanel = name;
+    for (const n of ['json', 'events', 'logs']) {
+      $('tab-' + n).classList.toggle('tab-active', n === name);
+      $(n + 'Panel').style.display = n === name ? 'block' : 'none';
+    }
+  }
+
+  function appendEvent(ev) {
+    const brief = ev.observation ? {...ev, observation: '[snapshot omitted]'} : ev;
+    $('eventsPanel').textContent = `[${new Date().toLocaleTimeString()}] ${JSON.stringify(brief)}\n` + $('eventsPanel').textContent;
+  }
+
+  function renderModes(modes) {
+    if (!modes) { $('modes').textContent = '-'; return; }
+    $('modes').innerHTML = Object.entries(modes).map(([k, v]) => {
+      return `<span class="pill ${v ? 'mode-on' : 'mode-off'}">${k}: ${v}</span>`;
+    }).join('');
+  }
+
+  function stateClass(state) {
+    const s = (state || '').toLowerCase();
+    if (s === 'running') return 'running';
+    if (s === 'error') return 'error';
+    return '';
+  }
+
+  function renderSessionList() {
+    const list = $('sessionList');
+    if (!sessions.length) {
+      list.innerHTML = '<span class="pill" style="background:transparent;border:none;padding-left:0;">No sessions. Click + to create one.</span>';
+      return;
+    }
+    list.innerHTML = sessions.map(s => {
+      const active = s.session_id === activeSessionId ? 'active' : '';
+      const stClass = stateClass(s.state);
+      const stateLabel = (s.state || 'unknown').toUpperCase();
+      return `
+        <div class="session-item ${active}" data-sid="${s.session_id}" onclick="selectSession('${s.session_id}')">
+          <span class="state-dot ${stClass}"></span>
+          <div class="info">
+            <div class="title" title="${s.session_id}">${s.session_id}</div>
+            <div class="meta">${s.command || '-'} · ${stateLabel} · ${s.rows}x${s.cols}</div>
+          </div>
+          <button class="close" title="Terminate session" onclick="event.stopPropagation(); terminateSession('${s.session_id}')">×</button>
+        </div>`;
+    }).join('');
+  }
+
+  function renderScreenTabs() {
+    const tabs = $('screenTabs');
+    if (!sessions.length) {
+      tabs.innerHTML = '<span class="pill" style="background:transparent;border:none;">No active session</span>';
+      return;
+    }
+    tabs.innerHTML = sessions.map(s => {
+      const active = s.session_id === activeSessionId ? 'active' : '';
+      return `
+        <div class="screen-tab ${active}" data-sid="${s.session_id}" onclick="selectSession('${s.session_id}')">
+          <span>${s.session_id}</span>
+          <button class="close" title="Terminate session" onclick="event.stopPropagation(); terminateSession('${s.session_id}')">×</button>
+        </div>`;
+    }).join('');
+  }
+
+  function updateSizeInputs(session) {
+    if (!session) return;
+    if (session.rows != null) $('rows').value = session.rows;
+    if (session.cols != null) $('cols').value = session.cols;
+  }
+
+  async function refreshSessions() {
+    try {
+      const data = await request('/sessions');
+      sessions = Array.isArray(data.sessions) ? data.sessions : (Array.isArray(data) ? data : []);
+
+      if (activeSessionId && !sessions.find(s => s.session_id === activeSessionId)) {
+        activeSessionId = '';
+      }
+      if (!activeSessionId && sessions.length) {
+        await selectSession(sessions[0].session_id, {observeIfMissing: false});
+        return;
+      }
+      renderSessionList();
+      renderScreenTabs();
+      const current = sessions.find(s => s.session_id === activeSessionId);
+      if (current) {
+        updateSizeInputs(current);
+        if (current.control) currentControl = current.control;
+      }
+      renderControlStatus();
+      if (!current) {
+        renderObservation(null);
+        syncAutoMode();
+        setPill('sessionStatus', 'warn-text', 'session: -');
+      }
+    } catch (e) {
+      setServer(false, 'server: ' + e.message);
+    }
+  }
+
+  async function selectSession(id, opts = {}) {
+    activeSessionId = id;
+    lastObservation = sessionObservations[id] || null;
+    renderSessionList();
+    renderScreenTabs();
+    renderObservation(lastObservation);
+
+    const current = sessions.find(s => s.session_id === id);
+    if (current) {
+      updateSizeInputs(current);
+      if (current.control) currentControl = current.control;
+    }
+    renderControlStatus();
+
+    syncAutoMode();
+    if (opts.observeIfMissing !== false && !sessionObservations[id]) {
+      await observe('agent').catch(() => {});
+    }
+  }
+
+  async function createSessionFromModal() {
+    const id = $('createId').value.trim();
+    try {
+      const body = {
+        id: id || undefined,
+        command: $('createCommand').value.trim() || 'bash',
+        rows: Number($('createRows').value) || 30,
+        cols: Number($('createCols').value) || 100,
+        owner: $('createOwner').value.trim() || 'anonymous',
+        purpose: $('createPurpose').value.trim() || null,
+      };
+      const data = await request('/sessions', {method: 'POST', body: JSON.stringify(body)});
+      if (data.observation) {
+        sessionObservations[data.session_id] = data.observation;
+      }
+      closeCreateModal();
+      await refreshSessions();
+      await selectSession(data.session_id);
+      appendEvent({type: 'created', data: {session_id: data.session_id}});
+    } catch (e) {
+      setServer(false, 'server: ' + e.message);
+      alert(e.message);
+    }
+  }
+
+  async function terminateSession(id) {
+    if (!confirm('Terminate session ' + id + '?')) return;
+    try {
+      await request(`/sessions/${encodeURIComponent(id)}?actor=${encodeURIComponent(actor())}`, {method: 'DELETE'});
+      delete sessionObservations[id];
+      if (activeSessionId === id) {
+        activeSessionId = '';
+        syncAutoMode();
+      }
+      await refreshSessions();
+      appendEvent({type: 'terminated', data: {session_id: id}});
+    } catch (e) {
+      setServer(false, 'server: ' + e.message);
+      alert(e.message);
+    }
+  }
+
+  function renderObservation(obs) {
+    lastObservation = obs;
+    if (!obs) {
+      $('screen').textContent = '';
+      $('jsonPanel').textContent = '';
+      $('detected').textContent = 'detected: -';
+      $('modes').textContent = '-';
+      setPill('sessionStatus', 'warn-text', 'session: -');
+      updateScreenStatus(null);
+      currentControl = null;
+      return;
+    }
+    const text = obs?.screen?.visible_text ?? '';
+    $('screen').textContent = text + (text.endsWith('\n') ? '' : '\n');
+    $('jsonPanel').textContent = JSON.stringify(obs, null, 2);
+
+    const alive = obs?.process?.alive ? 'alive' : 'dead';
+    const state = obs?.process?.state || '-';
+    const c = obs?.screen?.cursor || {row: '?', col: '?'};
+    const rows = obs?.screen?.rows || '?';
+    const cols = obs?.screen?.cols || '?';
+    setPill('sessionStatus', alive === 'alive' ? 'ok' : 'bad', `session: ${obs.session_id} ${state}`);
+
+    const d = obs.detected_state || {};
+    const readiness = d.input_readiness || {};
+    $('detected').textContent = `ready=${readiness.status || '-'}(${Math.round((readiness.confidence || 0) * 100)}%), tui=${d.tui_likely}, prompt=${d.prompt_likely}, confirm=${d.confirmation_likely}, error=${d.error_likely}`;
+    renderModes(obs.input_modes);
+    updateScreenStatus(obs);
+    if (obs.control) currentControl = obs.control;
+    renderControlStatus();
+  }
+
+  function updateScreenStatus(obs) {
+    if (!obs) {
+      $('statusState').textContent = '-';
+      $('statusState').className = 'pill';
+      $('statusPid').textContent = '-';
+      $('statusSeq').textContent = '-';
+      $('statusStable').textContent = '-';
+      $('statusCursor').textContent = '-';
+      return;
+    }
+    const proc = obs.process || {};
+    const state = proc.state || '-';
+    const stateLower = state.toLowerCase();
+    let cls = 'pill';
+    if (stateLower === 'running') cls += ' ok';
+    else if (stateLower === 'error') cls += ' bad';
+    else if (stateLower === 'exited') cls += ' warn-text';
+    $('statusState').textContent = state.toUpperCase();
+    $('statusState').className = cls;
+    $('statusPid').textContent = proc.pid ?? '-';
+    const seq = obs.update_seq ?? obs.seq ?? obs.observation_seq ?? obs.metadata?.update_seq ?? '-';
+    $('statusSeq').textContent = seq;
+    const stable = obs.stable_for_ms ?? obs.detected_state?.stable_ms ?? obs.screen?.stable_ms ?? '-';
+    $('statusStable').textContent = typeof stable === 'number' ? (stable / 1000).toFixed(1) + 's' : stable;
+    const cursor = obs.screen?.cursor || {row: '?', col: '?'};
+    $('statusCursor').textContent = `row ${cursor.row}, col ${cursor.col}`;
+  }
+
+  function getCurrentControl() {
+    if (currentControl) return currentControl;
+    const fromObs = lastObservation?.control;
+    if (fromObs) return fromObs;
+    const s = sessions.find(s => s.session_id === activeSessionId);
+    return s?.control;
+  }
+
+  function formatTimeLeft(isoOrMs) {
+    if (!isoOrMs) return '';
+    let ts;
+    if (typeof isoOrMs === 'number') ts = isoOrMs;
+    else ts = new Date(isoOrMs).getTime();
+    const sec = Math.max(0, Math.round((ts - Date.now()) / 1000));
+    return sec > 0 ? ` (${sec}s left)` : '';
+  }
+
+  function renderControlStatus() {
+    const c = getCurrentControl();
+    if (!c) {
+      $('lockStatus').textContent = 'Lock: free';
+      return;
+    }
+    const lockHolder = c.lock_holder ?? c.locked_by ?? c.lock?.actor ?? null;
+    const lockExpires = c.lock_expires_at ?? c.lock_expiry ?? c.lock?.expires_at ?? null;
+    if (lockHolder) {
+      $('lockStatus').textContent = `Lock: held by ${lockHolder}${formatTimeLeft(lockExpires)}`;
+    } else {
+      $('lockStatus').textContent = 'Lock: free';
+    }
+  }
+
+  function updateLastUpdated() {
+    $('lastUpdated').textContent = 'Last updated: ' + new Date().toLocaleTimeString();
+  }
+
+  function showToast(msg, isError = false, targetId = 'screenToast') {
+    const t = $(targetId);
+    if (!t) return;
+    t.textContent = msg;
+    t.style.background = isError ? 'rgba(185, 28, 28, 0.92)' : 'rgba(30, 58, 138, 0.92)';
+    t.style.color = '#fff';
+    t.style.display = 'inline-block';
+    if (t._toastTimeout) clearTimeout(t._toastTimeout);
+    t._toastTimeout = setTimeout(() => { t.style.display = 'none'; }, 2500);
+  }
+
+  async function refreshScreen() {
+    const btn = $('refreshBtn');
+    btn.textContent = 'Refreshing...';
+    btn.disabled = true;
+    await observe(currentView);
+    setTimeout(() => {
+      btn.textContent = 'Refresh';
+      btn.disabled = false;
+    }, 1000);
+  }
+
+  function setView(view) {
+    currentView = view;
+    $('viewAgent').classList.toggle('active', view === 'agent');
+    $('viewAgent').classList.toggle('secondary', view !== 'agent');
+    $('viewDebug').classList.toggle('active', view === 'debug');
+    $('viewDebug').classList.toggle('secondary', view !== 'debug');
+    if (sid()) observe(view);
+  }
+
+  function updateAutoModeStyle(mode) {
+    const sel = $('autoMode');
+    sel.classList.remove('mode-polling', 'mode-websocket');
+    if (mode === 'polling') sel.classList.add('mode-polling');
+    if (mode === 'websocket') sel.classList.add('mode-websocket');
+  }
+
+  function setAutoMode(mode) {
+    if (mode === autoMode) {
+      updateAutoModeStyle(mode);
+      return;
+    }
+    if (autoMode === 'polling') stopPolling();
+    if (autoMode === 'websocket') disconnectWs();
+    autoMode = mode;
+    $('autoMode').value = mode;
+    updateAutoModeStyle(mode);
+    syncAutoMode();
+    if (mode === 'polling') {
+      showToast(sid() ? 'Polling started' : 'No active session', !sid());
+    } else if (mode === 'websocket') {
+      showToast(sid() ? 'WebSocket connected' : 'No active session', !sid());
+    } else {
+      showToast('Auto refresh off');
+    }
+  }
+
+  function startPolling() {
+    refreshScreen();
+    pollInterval = setInterval(() => {
+      if (sid()) refreshScreen();
+    }, 2000);
+  }
+
+  function stopPolling() {
+    if (pollInterval) { clearInterval(pollInterval); pollInterval = null; }
+  }
+
+  function syncAutoMode() {
+    if (autoMode === 'off') {
+      stopPolling();
+      disconnectWs();
+    } else if (autoMode === 'polling') {
+      disconnectWs();
+      if (sid() && !pollInterval) startPolling();
+      if (!sid()) stopPolling();
+    } else if (autoMode === 'websocket') {
+      stopPolling();
+      if (sid()) connectWs();
+      else disconnectWs();
+    }
+  }
+
+  async function health() {
+    try {
+      const h = await request('/health');
+      $('logsPanel').textContent = JSON.stringify(h, null, 2);
+      setServer(true, 'server: ok');
+    } catch (e) {
+      setServer(false, 'server: ' + e.message);
+    }
+  }
+
+  async function observe(view = 'agent') {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const obs = await request(`/sessions/${encodeURIComponent(sid())}/observe?view=${view}`);
+      sessionObservations[sid()] = obs;
+      renderObservation(obs);
+      showPanel('json');
+      updateLastUpdated();
+    } catch (e) {
+      setServer(false, 'server: ' + e.message);
+      showToast('Observe failed: ' + e.message, true);
+    }
+  }
+
+  async function screenshot() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const res = await fetch(apiBase() + `/sessions/${encodeURIComponent(sid())}/screenshot`, {headers: token() ? {'Authorization': 'Bearer ' + token()} : {}});
+      const txt = await res.text();
+      if (!res.ok) throw new Error(txt);
+      $('screen').textContent = txt;
+      setServer(true);
+    } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  async function act(action, allowDangerous = false) {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const body = {actor: actor(), lock_token: $('lockToken').value.trim() || null, allow_dangerous: allowDangerous, action};
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/actions`, {method: 'POST', body: JSON.stringify(body)});
+      if (data.requires_approval) alert('Action blocked: ' + data.reason + '\npattern: ' + data.pattern);
+      setTimeout(() => observe('agent'), 120);
+      return data;
+    } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
+  }
+
+  function sendSubmit(allowDangerous = false) { act({type: 'submit', text: $('inputText').value}, allowDangerous); }
+  function sendText() { act({type: 'text', text: $('inputText').value}); }
+  function sendPaste() { act({type: 'paste', text: $('inputText').value}); }
+  function sendKey(key) { act({type: 'key', key}); }
+  function sendControl(key) { act({type: 'control', key}); }
+  function resizeSession() { act({type: 'resize', rows: Number($('rows').value), cols: Number($('cols').value)}); }
+
+  async function waitFor(until) {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const timeout_ms = $('timeout') ? Number($('timeout').value) : 10000;
+      const stable_ms = $('stable') ? Number($('stable').value) : 800;
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/wait`, {
+        method: 'POST',
+        body: JSON.stringify({until, timeout_ms, stable_ms})
+      });
+      appendEvent({type: 'wait_' + data.reason, data: {ok: data.ok}});
+      if (data.observation) {
+        sessionObservations[sid()] = data.observation;
+        renderObservation(data.observation);
+      }
+    } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  function connectWs() {
+    disconnectWs();
+    if (!sid()) return;
+    ws = new WebSocket(wsUrl(`/sessions/${encodeURIComponent(sid())}/events`));
+    setWs('connecting');
+    ws.onopen = () => setWs('connected');
+    ws.onerror = () => setWs('error');
+    ws.onclose = () => setWs('disconnected');
+    ws.onmessage = (msg) => {
+      const ev = JSON.parse(msg.data);
+      appendEvent(ev);
+      if (ev.observation) {
+        const o = ev.observation;
+        if (o.screen && o.screen.visible_text) $('screen').textContent = o.screen.visible_text + '\n';
+        if (o.input_modes) renderModes(o.input_modes);
+        const cached = sessionObservations[sid()];
+        if (cached) {
+          cached.input_modes = o.input_modes || cached.input_modes;
+          cached.detected_state = o.detected_state || cached.detected_state;
+          cached.process = o.process || cached.process;
+          cached.control = o.control || cached.control;
+          if (o.control) currentControl = o.control;
+          if (o.screen) Object.assign(cached.screen, o.screen);
+          lastObservation = cached;
+          $('jsonPanel').textContent = JSON.stringify(cached, null, 2);
+          updateScreenStatus(cached);
+          updateLastUpdated();
+          renderControlStatus();
+        }
+      }
+    };
+  }
+
+  function disconnectWs() {
+    if (ws) { ws.close(); ws = null; }
+    setWs('disconnected');
+  }
+
+  async function acquireLock() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/locks/acquire`, {
+        method: 'POST',
+        body: JSON.stringify({actor: actor(), lease_ms: 30000})
+      });
+      $('lockToken').value = data.lock_token || '';
+      appendEvent({type: 'lock_acquired', data});
+      showToast('Lock acquired', false, 'lockTakeoverToast');
+      applyControlFromResponse(data);
+      observe('agent');
+    } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
+  }
+
+  async function releaseLock() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/locks/release`, {
+        method: 'POST',
+        body: JSON.stringify({actor: actor(), lock_token: $('lockToken').value.trim()})
+      });
+      $('lockToken').value = '';
+      appendEvent({type: 'lock_released', data});
+      showToast('Lock released', false, 'lockTakeoverToast');
+      applyControlFromResponse(data);
+      observe('agent');
+    } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
+  }
+
+  async function startTakeover() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/takeover/start`, {
+        method: 'POST',
+        body: JSON.stringify({actor: actor(), reason: 'debug UI takeover'})
+      });
+      appendEvent({type: 'takeover_started', data});
+      showToast('Takeover started', false, 'lockTakeoverToast');
+      applyControlFromResponse(data);
+      observe('agent');
+    } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
+  }
+
+  async function endTakeover() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/takeover/end`, {
+        method: 'POST',
+        body: JSON.stringify({actor: actor()})
+      });
+      appendEvent({type: 'takeover_ended', data});
+      showToast('Takeover ended', false, 'lockTakeoverToast');
+      applyControlFromResponse(data);
+      observe('agent');
+    } catch (e) { setServer(false, 'server: ' + e.message); alert(e.message); }
+  }
+
+  function applyControlFromResponse(data) {
+    if (!data || !sid()) return;
+    const control = data.control ?? data.session?.control ?? null;
+    if (!control) return;
+    currentControl = control;
+    const cached = sessionObservations[sid()];
+    if (cached) cached.control = control;
+    renderControlStatus();
+  }
+
+  async function loadAudit() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/audit?tail=300`);
+      $('logsPanel').textContent = JSON.stringify(data, null, 2);
+      showPanel('logs');
+    } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  async function loadEvents() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/events/recent?tail=300`);
+      $('logsPanel').textContent = JSON.stringify(data, null, 2);
+      showPanel('logs');
+    } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  async function loadRaw() {
+    if (!sid()) { alert('No active session'); return; }
+    try {
+      const data = await request(`/sessions/${encodeURIComponent(sid())}/logs/raw?tail=20000`);
+      $('logsPanel').textContent = data.raw_tail || JSON.stringify(data, null, 2);
+      showPanel('logs');
+    } catch (e) { setServer(false, 'server: ' + e.message); }
+  }
+
+  async function copyScreen() {
+    const text = lastObservation?.screen?.visible_text || $('screen').textContent;
+    await navigator.clipboard.writeText(text);
+    appendEvent({type: 'copied_screen', data: {chars: text.length}});
+  }
+
+  $('inputText').addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') sendSubmit(false);
+  });
+
+  let isComposing = false;
+
+  function sendTextFromInput(text) {
+    if (!text || !sid()) return;
+    act({type: 'text', text});
+    $('screenInput').value = '';
+  }
+
+  $('screenInput').addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Enter','Tab','Escape','Backspace','Delete'].includes(k)) {
+      e.preventDefault();
+    }
+    if (k === 'ArrowUp') return sendKey('UP');
+    if (k === 'ArrowDown') return sendKey('DOWN');
+    if (k === 'ArrowLeft') return sendKey('LEFT');
+    if (k === 'ArrowRight') return sendKey('RIGHT');
+    if (k === 'Enter') return sendKey('ENTER');
+    if (k === 'Tab') return sendKey(e.shiftKey ? 'SHIFT_TAB' : 'TAB');
+    if (k === 'Escape') return sendKey('ESC');
+    if (k === 'Backspace') return sendKey('BACKSPACE');
+    if (k === 'Delete') return sendKey('DELETE');
+  });
+
+  $('screenInput').addEventListener('input', (e) => {
+    if (isComposing || !e.data) return;
+    sendTextFromInput(e.data);
+  });
+
+  $('screenInput').addEventListener('compositionstart', () => { isComposing = true; });
+  $('screenInput').addEventListener('compositionend', (e) => {
+    isComposing = false;
+    sendTextFromInput(e.data);
+  });
+
+  $('screenInput').addEventListener('paste', (e) => {
+    e.preventDefault();
+    if (!sid()) { alert('No active session'); return; }
+    const text = e.clipboardData.getData('text');
+    if (text) act({type: 'paste', text});
+    $('screenInput').value = '';
+  });
+
+  $('screen').addEventListener('click', () => $('screenInput').focus());
+  $('screen').addEventListener('focus', () => $('screenInput').focus());
+
+  function init() {
+    $('apiBase').value = inferApiBase();
+    const urlToken = readUrlToken();
+    loadSettings();
+    if (urlToken) $('token').value = urlToken;
+    saveSettings();
+
+    document.addEventListener('input', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') {
+        saveSettings();
+      }
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') { closeSettings(); closeCreateModal(); }
+    });
+
+    setView(currentView);
+
+    health().catch(() => {});
+    refreshSessions().then(() => {
+      setAutoMode($('autoMode').value);
+      if (autoMode === 'off' && activeSessionId) observe('agent').catch(() => {});
+    });
+    setInterval(refreshSessions, 5000);
+  }
+  init();
+</script>
+</body>
+</html>
