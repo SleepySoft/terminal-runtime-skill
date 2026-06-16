@@ -465,18 +465,24 @@
       </div>
 
       <div class="control-group">
-        <label>Scrollback</label>
-        <div class="button-row" style="align-items:center; justify-content:space-between; flex-wrap:wrap;">
-          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-            <input id="scrollbackTail" type="number" value="200" min="1" max="10000" title="Tail lines" style="width:80px;" />
-            <input id="scrollbackOffset" type="number" value="0" min="0" title="Offset" style="width:80px;" />
-            <input id="scrollbackLimit" type="number" value="200" min="1" max="1000" title="Limit" style="width:80px;" />
+        <label>Scrollback History</label>
+        <div class="button-row" style="align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;">
+            <div>
+              <label style="margin-bottom:2px;">每页行数</label>
+              <input id="scrollbackLimit" type="number" value="200" min="1" max="1000" style="width:90px;" />
+            </div>
+            <div>
+              <label style="margin-bottom:2px;">起始行号</label>
+              <input id="scrollbackOffset" type="number" value="0" min="0" style="width:90px;" />
+            </div>
+            <span id="scrollbackRange" class="pill" style="background:transparent;border:none;padding-left:0; margin-bottom:8px;">-</span>
           </div>
           <div style="display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="secondary" onclick="loadScrollback()">Load History</button>
             <button class="secondary" onclick="loadScrollbackPrev()">← Prev</button>
             <button class="secondary" onclick="loadScrollbackNext()">Next →</button>
-            <button class="danger small" onclick="resetScrollback()">Reset</button>
+            <button class="secondary" onclick="loadScrollback()">Refresh</button>
+            <button class="danger small" onclick="resetScrollback()">Clear</button>
           </div>
         </div>
       </div>
@@ -672,7 +678,7 @@
   function closeCreateModal() { $('createOverlay').style.display = 'none'; }
 
   function saveSettings() {
-    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackTail','scrollbackOffset','scrollbackLimit'];
+    const ids = ['apiBase','token','actor','createId','createCommand','createRows','createCols','createOwner','createPurpose','rows','cols','autoMode','lockToken','inputText','scrollbackOffset','scrollbackLimit'];
     const obj = {};
     for (const id of ids) {
       const el = $(id);
@@ -1252,26 +1258,32 @@
 
   async function loadScrollback() {
     if (!sid()) { alert('No active session'); return; }
-    const tail = Number($('scrollbackTail').value) || 200;
-    const offset = Number($('scrollbackOffset').value) || 0;
-    const limit = Number($('scrollbackLimit').value) || 200;
+    const offset = Math.max(0, Number($('scrollbackOffset').value) || 0);
+    const limit = Math.max(1, Math.min(1000, Number($('scrollbackLimit').value) || 200));
+    const tail = offset + limit;
     try {
       const data = await request(`/sessions/${encodeURIComponent(sid())}/history/scrollback?tail=${tail}&offset=${offset}&limit=${limit}`);
       const lines = data.scrollback || [];
-      $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + `\n--- offset=${data.offset} limit=${data.limit} returned=${lines.length} ---`;
+      const end = offset + lines.length;
+      const summary = lines.length
+        ? `--- 第 ${offset + 1}–${end} 行 (offset=${offset}, limit=${limit}) ---`
+        : `--- 该范围无历史 (offset=${offset}, limit=${limit}) ---`;
+      $('historyPanel').textContent = lines.join('\n') + (lines.length ? '\n' : '') + '\n' + summary;
+      $('scrollbackRange').textContent = lines.length ? `第 ${offset + 1}–${end} 行` : '无数据';
       showPanel('history');
       showToast(`Loaded ${lines.length} history lines`);
     } catch (e) { setServer(false, 'server: ' + e.message); showToast('Load history failed: ' + e.message, true); }
   }
 
   function loadScrollbackNext() {
-    const limit = Number($('scrollbackLimit').value) || 200;
-    $('scrollbackOffset').value = (Number($('scrollbackOffset').value) || 0) + limit;
+    const limit = Math.max(1, Number($('scrollbackLimit').value) || 200);
+    const offset = (Number($('scrollbackOffset').value) || 0) + limit;
+    $('scrollbackOffset').value = offset;
     loadScrollback();
   }
 
   function loadScrollbackPrev() {
-    const limit = Number($('scrollbackLimit').value) || 200;
+    const limit = Math.max(1, Number($('scrollbackLimit').value) || 200);
     const offset = Math.max(0, (Number($('scrollbackOffset').value) || 0) - limit);
     $('scrollbackOffset').value = offset;
     loadScrollback();
@@ -1284,8 +1296,9 @@
       await request(`/sessions/${encodeURIComponent(sid())}/history/reset?actor=${encodeURIComponent(actor())}`, {method: 'POST'});
       $('historyPanel').textContent = '';
       $('scrollbackOffset').value = '0';
-      showToast('Scrollback reset');
-    } catch (e) { setServer(false, 'server: ' + e.message); showToast('Reset history failed: ' + e.message, true); }
+      $('scrollbackRange').textContent = '-';
+      showToast('Scrollback cleared');
+    } catch (e) { setServer(false, 'server: ' + e.message); showToast('Clear history failed: ' + e.message, true); }
   }
 
   async function copyScreen() {
